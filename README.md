@@ -1,6 +1,6 @@
 # CircuitSentry v1.0.0
 
-A lightweight Windows overlay app that shows live CPU and GPU temperature and usage.
+A lightweight Windows overlay app that shows live CPU and GPU temperature and usage. asdasd
 
 ![CircuitSentry](assets/circuitsentry.png)
 
