@@ -2,6 +2,8 @@
 
 A lightweight Windows overlay app that shows live CPU and GPU temperature and usage.
 
+![alt text](circuitsentry.png)
+
 ---
 
 ## 🎯 Quick start for users
