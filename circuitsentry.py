@@ -274,7 +274,7 @@ if __name__ == "__main__":
             MenuItem('Open CircuitSentry', lambda : show_app(app)),
             MenuItem('Exit', lambda : os._exit(0))
         )
-        icon.icon = Image.open(resource_path('circuitsentry.ico'))
+        icon.icon = Image.open(resource_path('assets/circuitsentry.ico'))
         icon.title = 'CircuitSentry'
 
         icon.run_detached()
