@@ -33,25 +33,29 @@ def generate_config(window):
         window.config.write(configfile)
 
 def save_config(config, config_name:str, config_value):
+    if not config.has_section(CONFIGNAME_OPTIONS):
+        config.add_section(CONFIGNAME_OPTIONS)
     config[CONFIGNAME_OPTIONS][config_name] = config_value
     with open(get_file(CONFIG_FILENAME), 'w') as configfile:
         config.write(configfile)
 
 def get_config(config, config_name, default_config):
+    if config.has_option(CONFIGNAME_OPTIONS, config_name):
+        return config[CONFIGNAME_OPTIONS][config_name]
     config.read(get_file(CONFIG_FILENAME))
     if config.has_option(CONFIGNAME_OPTIONS, config_name):
         return config[CONFIGNAME_OPTIONS][config_name]
-    else:
-        save_config(config, config_name, default_config)
-        return default_config
+    save_config(config, config_name, default_config)
+    return default_config
 
 def get_config_bool(config, config_name, default_config):
+    if config.has_option(CONFIGNAME_OPTIONS, config_name):
+        return config.getboolean(CONFIGNAME_OPTIONS, config_name)
     config.read(get_file(CONFIG_FILENAME))
     if config.has_option(CONFIGNAME_OPTIONS, config_name):
-        return config.getboolean(CONFIGNAME_OPTIONS,config_name)
-    else:
-        save_config(config, config_name, default_config)
-        return default_config
+        return config.getboolean(CONFIGNAME_OPTIONS, config_name)
+    save_config(config, config_name, default_config)
+    return default_config
     
 def save_window_geometry_config(window):
     window.update()

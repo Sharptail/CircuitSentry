@@ -4,6 +4,8 @@ A lightweight Windows overlay app that shows live CPU and GPU temperature and us
 
 ![CircuitSentry](assets/circuitsentry.png)
 
+The window can be dragged anywhere, hidden to the tray, and configured with a right-click menu.
+
 ---
 
 ## 🎯 Quick start for users
@@ -29,17 +31,6 @@ That’s it. The app will open and start showing your CPU and GPU stats.
 
 ---
 
-## 🧰 What CircuitSentry shows
-
-- CPU temperature
-- GPU temperature
-- CPU usage
-- GPU usage
-
-The window can be dragged anywhere, hidden to the tray, and configured with a right-click menu.
-
----
-
 ## 🛠️ For developers
 
 ### Run from source
@@ -48,7 +39,7 @@ The window can be dragged anywhere, hidden to the tray, and configured with a ri
 2. Install dependencies:
 
    ```bash
-   pip install pythonnet pystray pillow tendo
+   pip install pythonnet pystray pillow tendo pytest pytest-cov
    ```
 
 3. Download the DLL support files and place them in the project folder.
@@ -57,6 +48,21 @@ The window can be dragged anywhere, hidden to the tray, and configured with a ri
    ```bash
    python circuitsentry.py
    ```
+
+### Run tests
+
+This project does not include the `.venv` folder in source control. Create and activate a local virtual environment before running tests.
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+pip install pythonnet pystray pillow tendo pytest pytest-cov
+python -m pytest --cov=. --cov-report=term-missing
+```
+
+### GitHub Actions CI
+
+A GitHub Actions workflow is included at `.github/workflows/ci.yml`. It runs on Windows and executes the same test command on push and pull request.
 
 ### Build a Windows executable
 
