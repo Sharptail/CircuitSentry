@@ -4,7 +4,7 @@ from tkinter.colorchooser import askcolor
 import configparser as cp
 import tkinter as tk
 import tkinter.messagebox as mb
-import sys, lhm, utils, os
+import sys, lhm, utils, os, ctypes, subprocess
 import winreg as reg
 import time
 import pystray
@@ -14,6 +14,27 @@ from PIL import Image
 # TODO
 # - try custom fonts
 # - throw exceptions
+
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
+def relaunch_as_admin():
+    if getattr(sys, 'frozen', False):
+        executable = sys.executable
+        params = ''
+    else:
+        executable = sys.executable
+        args = [os.path.abspath(sys.argv[0])] + sys.argv[1:]
+        params = ' '.join([f'"{arg}"' for arg in args])
+
+    shell32 = ctypes.windll.shell32
+    result = shell32.ShellExecuteW(None, 'runas', executable, params, None, 1)
+    return result > 32
+
 
 class CircuitSentry(tk.Tk):
     last_click_x, last_click_y = 0, 0
@@ -109,17 +130,45 @@ class CircuitSentry(tk.Tk):
         window.is_dragging = False
         utils.save_window_geometry_config(window)
 
-    def set_run_on_startup(window, is_run_on_startup):
-        pth = utils.get_file(APP_FILENAME)
-        key = reg.HKEY_CURRENT_USER
-        key_value = "Software\Microsoft\Windows\CurrentVersion\Run"
-        open = reg.OpenKey(key,key_value,0,reg.KEY_ALL_ACCESS)
-        if is_run_on_startup.get():
-            reg.SetValueEx(open,APP_FILENAME,0,reg.REG_SZ,pth)
+    def is_admin(window):
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except Exception:
+            return False
+
+    def create_startup_task(window):
+        task_name = "CircuitSentry"
+        if getattr(sys, 'frozen', False):
+            task_command = f'"{utils.get_file(APP_FILENAME)}"'
         else:
-            reg.DeleteValue(open, APP_FILENAME)
-        reg.CloseKey(open)
-        utils.save_config(window.config, CONFIGNAME_WINDOW_OPEN_ON_STARTUP, str(is_run_on_startup.get()))
+            task_command = f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
+        cmd = f'schtasks /Create /TN "{task_name}" /TR "{task_command}" /SC ONLOGON /RL HIGHEST /F'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result.returncode == 0
+
+    def delete_startup_task(window):
+        task_name = "CircuitSentry"
+        cmd = f'schtasks /Delete /TN "{task_name}" /F'
+        subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+    def set_run_on_startup(window, is_run_on_startup):
+        if is_run_on_startup.get():
+            if not window.is_admin():
+                mb.showwarning(
+                    title="Administrator required",
+                    message="Creating an elevated startup task requires administrator rights. "
+                            "Please run CircuitSentry as administrator once, then enable this option."
+                )
+                is_run_on_startup.set(False)
+                return
+            if window.create_startup_task():
+                utils.save_config(window.config, CONFIGNAME_WINDOW_OPEN_ON_STARTUP, str(is_run_on_startup.get()))
+            else:
+                mb.showerror(title="Startup task failed", message="Could not create the startup task.")
+                is_run_on_startup.set(False)
+        else:
+            window.delete_startup_task()
+            utils.save_config(window.config, CONFIGNAME_WINDOW_OPEN_ON_STARTUP, str(is_run_on_startup.get()))
 
     def close_options_window(window, options_window ):
         window.options_window_opened = False
@@ -137,7 +186,7 @@ class CircuitSentry(tk.Tk):
 
         run_on_startup_cb_value = tk.BooleanVar()
         run_on_startup_cb_value.set(utils.get_config(window.config, CONFIGNAME_WINDOW_OPEN_ON_STARTUP, DEFAULT_WINDOW_OPEN_ON_STARTUP))
-        startup_checkbox = tk.Checkbutton(options_window, text='Run CircuitSentry on window startup?',variable=run_on_startup_cb_value, onvalue=True, offvalue=False, command=lambda:window.set_run_on_startup(run_on_startup_cb_value))
+        startup_checkbox = tk.Checkbutton(options_window, text='Run CircuitSentry on startup (requires admin)',variable=run_on_startup_cb_value, onvalue=True, offvalue=False, command=lambda:window.set_run_on_startup(run_on_startup_cb_value))
         startup_checkbox.grid(row=0, column=0, sticky=tk.W)
 
         always_on_top_cb_value = tk.BooleanVar()
@@ -148,12 +197,12 @@ class CircuitSentry(tk.Tk):
         bg_transparent_cb_value = tk.BooleanVar()
         bg_transparent_cb_value.set(utils.get_config(window.config, CONFIGNAME_WINDOW_BG_IS_TRANSPARENT, DEFAULT_WINDOW_BG_IS_TRANSPARENT))
         bg_transparent_checkbox = tk.Checkbutton(options_window, text='Transparent Background',variable=bg_transparent_cb_value, onvalue=True, offvalue=False, command=lambda:utils.set_bg_transparency(window, bg_transparent_cb_value))
-        bg_transparent_checkbox.grid(row=2, column=0, sticky=tk.W)
+        bg_transparent_checkbox.grid(row=3, column=0, sticky=tk.W)
 
         txt_transparent_cb_value = tk.BooleanVar()
         txt_transparent_cb_value.set(utils.get_config(window.config, CONFIGNAME_WINDOW_TEXT_IS_TRANSPARENT, DEFAULT_WINDOW_TEXT_IS_TRANSPARENT))
         txt_transparent_checkbox = tk.Checkbutton(options_window, text='Transparent Text',variable=txt_transparent_cb_value, onvalue=True, offvalue=False, command=lambda:utils.set_txt_transparency(window, txt_transparent_cb_value))
-        txt_transparent_checkbox.grid(row=3, column=0, sticky=tk.W)
+        txt_transparent_checkbox.grid(row=4, column=0, sticky=tk.W)
 
         bg_frame = tk.Frame(options_window)
         bg_frame.columnconfigure(0, weight=2)
@@ -191,6 +240,12 @@ class CircuitSentry(tk.Tk):
         txt_transparent_cb_value.set(0)
 
 if __name__ == "__main__":
+    if not is_admin():
+        if not relaunch_as_admin():
+            mb.showerror(title="Administrator required", message="CircuitSentry must be run as administrator.")
+            sys.exit()
+        sys.exit()
+
     try:
         me = singleton.SingleInstance()
     except singleton.SingleInstanceException:
@@ -207,6 +262,11 @@ if __name__ == "__main__":
     
     def show_app(app):
         app.deiconify()
+        app.update()
+        app.lift()
+        app.focus_force()
+        always_on_top = utils.get_config(app.config, CONFIGNAME_WINDOW_ALWAYS_ON_TOP, DEFAULT_WINDOW_ALWAYS_ON_TOP)
+        app.attributes('-topmost', str(always_on_top).lower() in ('true', '1', 'yes'))
 
     def init_sys_tray(app):
         icon = pystray.Icon('mon')
